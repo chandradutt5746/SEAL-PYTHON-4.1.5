@@ -1,6 +1,48 @@
 from seal import *
 import cmath
 import time
+import os
+import tempfile
+
+def convert_to_ciphertext(serializable_ct, context):
+    """Convert SerializableCiphertext to Ciphertext for use with Evaluator operations.
+    
+    The SEAL Python binding has SerializableCiphertext and Ciphertext as separate types.
+    Evaluator operations require Ciphertext objects, while encrypt() returns SerializableCiphertext.
+    This function handles the conversion efficiently using an     # Encode and encrypt a vector of complex numbers
+    complex_data = [cmath.rect(1, i * 0.1) for i in range(10)]
+    
+    # Extract real parts for encode_new as this binding doesn't support direct complex encoding
+    real_data = [complex_num.real for complex_num in complex_data]
+    plain = encoder.encode_new(real_data, scale)emory temporary file.
+    
+    Args:
+        serializable_ct: The SerializableCiphertext returned by encryptor.encrypt()
+        context: SEALContext object used for loading
+        
+    Returns:
+        Ciphertext: A regular Ciphertext object that can be used with Evaluator
+    """
+    # Check if already a Ciphertext (no conversion needed)
+    if isinstance(serializable_ct, Ciphertext):
+        return serializable_ct
+    
+    # Create a temporary file that gets automatically deleted when closed
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_filename = temp_file.name
+    
+    try:
+        # Save to temp file
+        serializable_ct.save(temp_filename)
+        
+        # Load as Ciphertext
+        ciphertext = Ciphertext()
+        ciphertext.load(context, temp_filename)
+        return ciphertext
+    finally:
+        # Clean up temp file
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)
 
 """CKKS Homomorphic Encryption Setup Example (Beginner Friendly)
 
@@ -25,9 +67,21 @@ def get_seal():
          - Commonly set as `2.0 ** 40` or `2.0 ** 30`.
     """
     parms = EncryptionParameters(SchemeType.CKKS)
+    
+    # Choose parameters based on security level
+    # if security_level == sec_level_type.TC192:  # UPPERCASE
+    #     poly_modulus_degree = 16384
+    #     coeff_modulus = [60, 50, 50, 50, 50, 60]
+    # elif security_level == sec_level_type.TC256:  # UPPERCASE
+    #     poly_modulus_degree = 32768
+    #     coeff_modulus = [60, 55, 55, 55, 55, 55, 60]
+    # else:  # Default to 128-bit
+    #     poly_modulus_degree = 8192
+    #     coeff_modulus = [60, 40, 40, 60]
+
     poly_modulus_degree = 8192
     parms.set_poly_modulus_degree(poly_modulus_degree)
-    parms.set_coeff_modulus(CoeffModulus.Create(poly_modulus_degree, [60, 40, 40, 60]))
+    parms.set_coeff_modulus(CoeffModulus.Create(8192, [60, 40, 40, 60]))
     scale = 2.0 ** 40
     """2. **Create a SEAL Context**
        - `SEALContext(parms)`: Checks your parameters and prepares everything for encryption.
@@ -39,7 +93,25 @@ def get_seal():
        - `slot_count`: How many numbers you can pack at once (half of `poly_modulus_degree`).
 
     """
-    context = SEALContext(parms)
+    context = SEALContext(parms, expand_mod_chain=True, sec_level=sec_level_type.TC128)
+    
+    # Validate parameters
+    if not context.parameters_set():
+        context_data = context.key_context_data()
+        if context_data:
+            qualifiers = context_data.qualifiers
+            error_msg = f"Parameters invalid: {qualifiers.parameter_error_name} - {qualifiers.parameter_error_message}"
+            raise ValueError(error_msg)
+        raise ValueError("Encryption parameters are invalid")
+    
+
+    context_data = context.key_context_data()
+    if context_data:
+        qualifiers = context_data.qualifiers  
+        print(f'[DEBUG] Security level: {qualifiers.sec_level}')
+    else:
+        print('[WARNING] No context data available')
+
     ckks_encoder = CKKSEncoder(context)
     slot_count = ckks_encoder.slot_count()
     print('[DEBUG] Slot count:', slot_count)
@@ -107,17 +179,10 @@ def evaluator_example():
     cipher2 = encryptor.encrypt(plain2)  # returns SerializableCiphertext
 
     # Convert SerializableCiphertext to Ciphertext for Evaluator
-    cipher2.save('tmp_cipher2.bin')
-    cipher2_ct = Ciphertext()
-    cipher2_ct.load(context, 'tmp_cipher2.bin')
-    cipher2 = cipher2_ct
-
+    cipher2 = convert_to_ciphertext(cipher2, context)
+    
     # If cipher from get_seal() is not Ciphertext, convert:
-    if not isinstance(cipher, Ciphertext):
-        cipher.save('tmp_cipher.bin')
-        tmp = Ciphertext()
-        tmp.load(context, 'tmp_cipher.bin')
-        cipher = tmp
+    cipher = convert_to_ciphertext(cipher, context)
 
     print('[DEBUG] Encoded and encrypted data2:', data2)
 
@@ -145,12 +210,15 @@ def evaluator_example():
 
     # Rescale (if supported)
     try:
-        evaluator.rescale_to_next(cipher)
+        # Create destination for rescaled result
+        rescaled_cipher = Ciphertext()
+        evaluator.rescale_to_next(cipher, rescaled_cipher)
+        cipher = rescaled_cipher  # Update cipher reference
         print('[DEBUG] Performed rescale_to_next')
-        plain_result3 = Plaintext()
-        decryptor.decrypt(cipher, plain_result3)
-        decoded_result3 = encoder.decode(plain_result3)
-        print('[DEBUG] Decoded after rescale:', decoded_result3[:10])
+        
+        # Decrypt and decode using our helper function
+        decoded_result3 = decrypt_and_decode(cipher, decryptor, encoder)
+        print('[DEBUG] Decoded after rescale:', decoded_result3)
     except Exception as e:
         print('[DEBUG] Rescale failed:', e)
     
@@ -373,14 +441,15 @@ def ckks_rescale_modswitch_example():
     cipher_serializable = encryptor.encrypt(plain)
 
     # Convert to Ciphertext for Evaluator
-    cipher_serializable.save('tmp_ckks_rescale_cipher.bin')
-    cipher = Ciphertext()
-    cipher.load(context, 'tmp_ckks_rescale_cipher.bin')
+    cipher = convert_to_ciphertext(cipher_serializable, context)
 
     # Multiply and rescale
     evaluator.multiply_inplace(cipher, cipher)
     evaluator.relinearize_inplace(cipher, relin_keys)
-    evaluator.rescale_to_next(cipher)
+    # Create destination ciphertext for rescale_to_next
+    rescaled_cipher = Ciphertext()
+    evaluator.rescale_to_next(cipher, rescaled_cipher)
+    cipher = rescaled_cipher  # Update cipher to use the rescaled version
     print('[DEBUG] Performed multiply, relinearize, and rescale_to_next')
 
     # Modulus switch to next
@@ -388,10 +457,8 @@ def ckks_rescale_modswitch_example():
     print('[DEBUG] Performed mod_switch_to_next_inplace')
 
     # Decrypt and decode
-    plain_result = Plaintext()
-    decryptor.decrypt(cipher, plain_result)
-    decoded = encoder.decode(plain_result)
-    print('[DEBUG] Decoded after rescale and modswitch:', decoded[:10])
+    decoded = decrypt_and_decode(cipher, decryptor, encoder)
+    print('[DEBUG] Decoded after rescale and modswitch:', decoded)
     print('-' * 70)
 
 def ckks_conjugation_example():
@@ -405,24 +472,23 @@ def ckks_conjugation_example():
     cipher, context, encoder, decryptor, evaluator, encryptor, scale, relin_keys, galois_keys = get_seal()
 
     # Encode and encrypt a vector of complex numbers
-    data = [cmath.rect(1, i * 0.1) for i in range(10)]
-    plain = encoder.encode_new(data, scale)
+    complex_data = [cmath.rect(1, i * 0.1) for i in range(10)]
+    
+    # Extract real parts for encode_new as this binding doesn't support direct complex encoding
+    real_data = [complex_num.real for complex_num in complex_data]
+    plain = encoder.encode_new(real_data, scale)
     cipher_serializable = encryptor.encrypt(plain)
 
     # Convert to Ciphertext for Evaluator
-    cipher_serializable.save('tmp_ckks_conj_cipher.bin')
-    cipher = Ciphertext()
-    cipher.load(context, 'tmp_ckks_conj_cipher.bin')
+    cipher = convert_to_ciphertext(cipher_serializable, context)
 
     # Apply complex conjugation
     evaluator.complex_conjugate_inplace(cipher, galois_keys)
     print('[DEBUG] Performed complex_conjugate_inplace')
 
     # Decrypt and decode
-    plain_conj = Plaintext()
-    decryptor.decrypt(cipher, plain_conj)
-    decoded_conj = encoder.decode_complex(plain_conj)
-    print('[DEBUG] Decoded after conjugation:', decoded_conj[:10])
+    decoded_conj = decrypt_and_decode(cipher, decryptor, encoder)
+    print('[DEBUG] Decoded after conjugation:', decoded_conj)
     print('-' * 70)
 
 def ckks_rotation_example():
@@ -443,7 +509,7 @@ def ckks_rotation_example():
 
     3. **Convert SerializableCiphertext to Ciphertext**
        - Some SEAL operations need a `Ciphertext` object, not a `SerializableCiphertext`.
-       - We save to a file and load it back as a `Ciphertext`.
+       - We use our utility function to efficiently convert between types.
 
     4. **Rotate the Vector**
        - `evaluator.rotate_vector_inplace(cipher, 2, galois_keys)`: Rotates the vector left by 2 positions.
@@ -464,12 +530,8 @@ def ckks_rotation_example():
 
     # Convert to Ciphertext for Evaluator
     print('[DEBUG] Converting SerializableCiphertext to Ciphertext for rotation')
-    # Save to a file and load it back as a Ciphertext
     # This is necessary because some SEAL operations require a Ciphertext object not a SerializableCiphertext
-    # This is a workaround to ensure compatibility with the Evaluator
-    cipher_serializable.save('tmp_ckks_rot_cipher.bin')
-    cipher = Ciphertext()
-    cipher.load(context, 'tmp_ckks_rot_cipher.bin')
+    cipher = convert_to_ciphertext(cipher_serializable, context)
 
     # Rotate left by 2
     print('[DEBUG] Performing rotate_vector_inplace by 2')
@@ -492,12 +554,160 @@ def ckks_rotation_example():
 
     # Decrypt and decode
     print('[DEBUG] Decrypting and decoding the rotated vector')
-
-    plain_rot = Plaintext()
-    decryptor.decrypt(cipher, plain_rot)
-    decoded_rot = encoder.decode(plain_rot)
-    print('[DEBUG] Decoded after rotation:', decoded_rot[:10])
+    decoded_rot = decrypt_and_decode(cipher, decryptor, encoder)
+    print('[DEBUG] Decoded after rotation:', decoded_rot)
     print('-' * 70)
+
+def numpy_integration_example():
+    """Example showing how to use the NumPy integration features.
+    
+    This example demonstrates the high-performance NumPy integration features
+    added to the SEAL-Python bindings.
+    """
+    try:
+        import numpy as np
+    except ImportError:
+        print("NumPy not installed. Install with: pip install numpy")
+        return
+        
+    print('=' * 70)
+    print('[EXAMPLE] NumPy Integration Example')
+    print('=' * 70)
+    
+    # Create the encryption parameters and context
+    print('[DEBUG] Setting up encryption parameters')
+    params = EncryptionParameters(SchemeType.CKKS)
+    poly_modulus_degree = 8192
+    params.set_poly_modulus_degree(poly_modulus_degree)
+    params.set_coeff_modulus(CoeffModulus.Create(poly_modulus_degree, [40, 40, 40, 40]))
+    context = SEALContext(params)
+    
+    # Generate keys
+    print('[DEBUG] Generating keys')
+    keygen = KeyGenerator(context)
+    public_key = keygen.create_public_key()  # Note: using the specific API for this binding
+    secret_key = keygen.secret_key()
+    
+    # Create encrytor, evaluator, and decryptor
+    encryptor = Encryptor(context, public_key)
+    evaluator = Evaluator(context)
+    decryptor = Decryptor(context, secret_key)
+    
+    # Create encoder
+    encoder = CKKSEncoder(context)
+    slot_count = encoder.slot_count()
+    print(f'[DEBUG] Number of slots: {slot_count}')
+    
+    # Create a NumPy array with test data
+    print('[DEBUG] Creating NumPy array with test data')
+    scale = 2.0**40
+    
+    # Create some test data
+    input_data = np.array([3.1415, 2.7182, 1.4142, 1.7320, 2.2360, 2.6457])
+    print(f'[DEBUG] Input data: {input_data}')
+    
+    # Create a full array padded with zeros
+    padded_data = np.zeros(slot_count)
+    padded_data[:len(input_data)] = input_data
+    
+    # Method 1: Encode directly from NumPy array
+    print('[DEBUG] Encoding using encode_new_numpy method')
+    plaintext = encoder.encode_new_numpy(padded_data, scale)
+    
+    # Encrypt
+    print('[DEBUG] Encrypting')
+    serializable_ct = encryptor.encrypt(plaintext)
+    
+    # Convert to Ciphertext for Evaluator operations
+    print('[DEBUG] Converting SerializableCiphertext to Ciphertext')
+    ciphertext = convert_to_ciphertext(serializable_ct, context)
+    
+    # Perform a simple operation (square the values)
+    print('[DEBUG] Squaring the encrypted values')
+    evaluator.square_inplace(ciphertext)
+    evaluator.relinearize_inplace(ciphertext, keygen.create_relin_keys())
+    
+    # Use destination parameter for rescale_to_next
+    rescaled_cipher = Ciphertext()
+    evaluator.rescale_to_next(ciphertext, rescaled_cipher)
+    ciphertext = rescaled_cipher  # Update ciphertext to use the rescaled version
+    
+    # Decrypt
+    print('[DEBUG] Decrypting')
+    # decrypted = decryptor.decrypt(ciphertext)
+    
+    # Decode
+    print('[DEBUG] Decoding')
+    result = decrypt_and_decode(ciphertext, decryptor, encoder)
+
+    # Check results
+    print('[DEBUG] Original values:', input_data)
+    print('[DEBUG] Squared values (decrypted):', result[:len(input_data)])
+    print('[DEBUG] Expected squared values:', input_data ** 2)
+    print('[DEBUG] Absolute error:', np.abs(result[:len(input_data)] - input_data ** 2))
+    
+    # Method 2: Convert ciphertext to NumPy array
+    print('\n[DEBUG] Converting ciphertext to NumPy array')
+    cipher_array = ciphertext.to_array()
+    print(f'[DEBUG] Ciphertext array shape: {cipher_array.shape}')
+    
+    # Method 3: Get zero-copy view of ciphertext
+    print('\n[DEBUG] Getting zero-copy view of ciphertext')
+    view = ciphertext.to_array_view()
+    print(f'[DEBUG] View shape: {view.shape}')
+    
+    # Method 4: Batch operations
+    print('\n[DEBUG] Testing batch operations')
+    serializable_ciphertexts = [encryptor.encrypt(encoder.encode_new_numpy(np.ones(slot_count) * i, scale)) 
+                               for i in range(3)]
+    
+    # Convert for batch operations
+    ciphertexts = [convert_to_ciphertext(ct, context) for ct in serializable_ciphertexts]
+    
+    # Save to file
+    print('[DEBUG] Saving ciphertexts in batch')
+    Ciphertext.batch_save(ciphertexts, 'numpy_test_batch.bin')
+    
+    # Load from file
+    print('[DEBUG] Loading ciphertexts in batch')
+    loaded = Ciphertext.batch_load(context, 'numpy_test_batch.bin')
+    print(f'[DEBUG] Loaded {len(loaded)} ciphertexts')
+    
+    # Verify the loaded data
+    for i, ct in enumerate(loaded):
+        result = decrypt_and_decode(ct, decryptor, encoder)
+        print(f'[DEBUG] Ciphertext {i} contains: {result[0]}')
+    
+    print('[DEBUG] NumPy integration example completed successfully')
+    print('=' * 70)
+
+def decrypt_and_decode(cipher, decryptor, encoder, num_results=10, use_complex=False):
+    """Helper function to decrypt and decode a ciphertext, reducing code duplication.
+    
+    Args:
+        cipher: The ciphertext to decrypt
+        decryptor: Decryptor object
+        encoder: CKKSEncoder object
+        num_results: Number of results to return (default: 10)
+        use_complex: Whether to use decode_complex instead of decode (default: False)
+        
+    Returns:
+        list: Decoded values
+    """
+    # Create plaintext for results
+    plain_result = Plaintext()
+    
+    # Decrypt the ciphertext
+    decryptor.decrypt(cipher, plain_result)
+    
+    # Decode the plaintext - use the correct available method
+    if use_complex and hasattr(encoder, "decode_complex"):
+        decoded_values = encoder.decode_complex(plain_result)
+    else:
+        decoded_values = encoder.decode(plain_result)
+    
+    # Return the specified number of results
+    return decoded_values[:num_results]
 
 if __name__ == "__main__":
     serialization_example()
@@ -508,4 +718,5 @@ if __name__ == "__main__":
     ckks_rotation_example()
     ckks_rescale_modswitch_example()
     ckks_conjugation_example()
+    numpy_integration_example()
     print('All examples completed successfully.')

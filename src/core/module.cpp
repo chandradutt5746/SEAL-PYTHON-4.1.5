@@ -30,6 +30,8 @@ PYBIND11_MODULE(seal, m) {
     m.attr("__version__") = "4.1.2";
 
     // Bind enums
+    py::gil_scoped_release release;
+    py::gil_scoped_acquire acquire;
     py::enum_<scheme_type>(m, "SchemeType")
         .value("BFV", scheme_type::bfv)
         .value("CKKS", scheme_type::ckks)
@@ -68,5 +70,18 @@ PYBIND11_MODULE(seal, m) {
     m.def("secure_erase", [](std::string &s) {
         seal::util::seal_memzero(s.data(), s.size());
         s.clear();
+    });
+    m.def("bytes_to_parms_id", [](py::bytes bytes) {
+        std::string str = bytes;
+        if (str.size() != sizeof(parms_id_type)) {
+            throw std::invalid_argument("Invalid bytes size for parms_id");
+        }
+        parms_id_type id;
+        std::memcpy(id.data(), str.data(), sizeof(parms_id_type));
+        return id;
+    });
+
+    m.def("parms_id_to_bytes", [](const parms_id_type &id) {
+        return py::bytes(reinterpret_cast<const char*>(id.data()), sizeof(parms_id_type));
     });
 }

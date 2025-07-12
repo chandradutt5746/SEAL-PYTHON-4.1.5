@@ -32,8 +32,11 @@ A Python binding for [Microsoft SEAL](https://github.com/microsoft/SEAL), enabli
 
 - Python bindings for Microsoft SEAL 4.1.2
 - CKKS, BFV, and BGV schemes for encrypted computation
+- **High-performance NumPy integration** for efficient data transfer and manipulation
 - Serialization and deserialization of ciphertexts and keys
-- Example scripts for batching
+- Batch operations for efficient processing of multiple ciphertexts
+- Zero-copy memory views for advanced performance
+- Example scripts for batching and NumPy integration
 - Beginner-friendly code and debug output for learning.
 
 ---
@@ -47,6 +50,9 @@ A Python binding for [Microsoft SEAL](https://github.com/microsoft/SEAL), enabli
 ├── CMakeLists.txt          # CMake build configuration
 ├── README.md               # This file
 ├── setup.py                # Python package setup
+├── docs/
+│   ├── numpy_integration.md
+│   └── quick_reference.md
 ├── python/                 # Python bindings and test scripts
 │   ├── seal.so             # Compiled Python extension
 │   ├── test_ckks.py
@@ -146,11 +152,13 @@ After building, you can run the example scripts:
 ### In this 'python' folder you will find seal.so file after building the Python Binding.
 ### Do not Remove this file otherwise you have to build the seal again.
 
-#### for basic understanding just try to open the test_bfv_and_bgv.py file and learn. after That you can move to bootstrapping.py file for advanced operations.
+#### For basic understanding, try to open these example files in order:
+
 ```sh
 cd python
-python test_bfv_and_bgv.py
-python test_bootstrapping.py
+python test_bfv_and_bgv.py        # Basic BFV and BGV examples
+python test_numpy_integration.py   # NumPy integration examples
+python test_bootstrapping.py       # Advanced bootstrapping operations
 ```
 
 - The `seal.so` file must be present in the `python/` directory for imports to work.
@@ -159,14 +167,49 @@ python test_bootstrapping.py
 ---
 
 ## Usage Examples
+
+### Basic Usage
+
+See `python/test_bfv_and_bgv.py` for basic examples of using BFV and BGV schemes.
+
+### NumPy Integration
+
+SEAL-Python provides powerful NumPy integration features for high-performance data handling:
+
+- **Direct encoding from NumPy arrays** with `encode_new_numpy()`
+- **Converting ciphertexts to NumPy arrays** with `to_array()`
+- **Zero-copy views** of ciphertext data with `to_array_view()`
+- **Batch operations** for multiple ciphertexts
+
+For detailed examples and usage, see the [NumPy Integration Guide](docs/numpy_integration.md) and the example scripts in the `python/` directory.
+
+For a complete example, see `python/test_numpy_integration.py`.
+
+### Advanced Usage
+
+See `python/test_bootstrapping.py` for examples of advanced operations.
+
+## Important API Notes
+
+1. **Key Generation**: This binding uses `keygen.create_public_key()` rather than `keygen.public_key()` which might be found in other bindings.
+
+2. **SerializableCiphertext vs Ciphertext**: The `encrypt()` method returns a `SerializableCiphertext` object, while the `decrypt()` method requires a `Ciphertext` object. You need to convert between these types using serialization when decrypting data.
+
+3. **Batch Operations**: When working with multiple ciphertexts, you'll need to convert between serializable and regular ciphertext types.
+
+4. **NumPy Integration**: The `encode_new_numpy()` method provides efficient encoding of NumPy arrays.
+
+For complete examples of these operations, see the [Quick Reference Guide](docs/quick_reference.md) and the example files in the `python/` directory.
+
 ## Testing
 
 You can run the provided test scripts:
 
 ```sh
 cd python
-python test_bootstrapping.py
 python test_bfv_and_bgv.py
+python test_numpy_integration.py
+python test_bootstrapping.py
 ```
 
 ---
@@ -189,11 +232,18 @@ python test_bfv_and_bgv.py
 
 ---
 
+## Documentation
+
+- [NumPy Integration Guide](docs/numpy_integration.md) - Detailed guide on using NumPy with SEAL-Python
+- [Quick Reference Guide](docs/quick_reference.md) - Concise examples and tips for common SEAL-Python operations
+- Additional documentation can be found in the `docs/` directory.
+
 ## References
 
 - [Microsoft SEAL Documentation](https://github.com/microsoft/SEAL)
 - [Homomorphic Encryption Standardization](https://homomorphicencryption.org/)
 - [pybind11 Documentation](https://pybind11.readthedocs.io/en/stable/)
+- [NumPy Documentation](https://numpy.org/doc/)
 
 ---
 
@@ -218,6 +268,21 @@ This project is licensed under the MIT License. See [third_party/SEAL/LICENSE](t
 For collaboration, questions, or contributions, please:
 - Open an issue or pull request on GitHub
 - Connect on [LinkedIn](https://www.linkedin.com/in/cnpatel5746/)
+
+---
+
+## Example Files
+
+The `python/` directory contains several example files to help you get started:
+
+- **basic_example.py** - Simple example demonstrating core API usage including proper handling of SerializableCiphertext vs Ciphertext
+- **test_bfv_and_bgv.py** - Examples of using BFV and BGV encryption schemes
+- **test_ckks.py** - Examples of using the CKKS encryption scheme for floating-point operations
+- **test_numpy_integration.py** - Comprehensive examples of NumPy integration features
+- **numpy_simple_example.py** - Simple examples focused on NumPy integration
+- **numpy_quick_example.py** - Quick demonstration of NumPy features
+
+These examples are designed to be run in order of increasing complexity and provide detailed comments to help you understand how to use the library effectively.
 
 ---
 

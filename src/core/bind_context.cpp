@@ -55,16 +55,19 @@ void bind_context(py::module &m) {
             py::arg("expand_mod_chain") = true, 
             py::arg("sec_level") = sec_level_type::tc128)
         .def("parameters_set", &SEALContext::parameters_set)
-        .def("get_context_data",  // ADDED OVERLOAD FOR BYTES
-            [](const SEALContext &ctx, py::bytes parms_id_bytes) {
-                std::string bytes = parms_id_bytes;
-                if (bytes.size() != 32) {
-                    throw std::invalid_argument("parms_id must be 32 bytes");
-                }
-                parms_id_type parms_id;
-                std::memcpy(parms_id.data(), bytes.data(), 32);
-                return ctx.get_context_data(parms_id);
-            }, py::arg("parms_id"))
+        .def("get_context_data", [](const SEALContext &ctx, py::bytes parms_id_bytes) {
+            std::string bytes = parms_id_bytes;
+            if (bytes.size() != 32) {
+                throw std::invalid_argument("parms_id must be 32 bytes");
+            }
+            parms_id_type parms_id;
+            std::memcpy(parms_id.data(), bytes.data(), 32);
+            auto data = ctx.get_context_data(parms_id);
+            if (!data) {
+                throw std::runtime_error("Invalid parameters ID or context data not found");
+            }
+            return data;
+        }, py::arg("parms_id"))
         .def("key_parms_id", [](const SEALContext &ctx) {
             auto id = ctx.key_parms_id();
             return py::bytes(reinterpret_cast<const char*>(id.data()), id.size());

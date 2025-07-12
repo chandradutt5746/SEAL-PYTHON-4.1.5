@@ -3,6 +3,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/complex.h>
+#include <pybind11/numpy.h>
 
 namespace py = pybind11;
 using namespace seal;
@@ -71,11 +72,19 @@ void bind_ckksencoder(py::module &m) {
         })
 
         // Add this overload for complex<double>
-        .def("encode_new", [](const CKKSEncoder &encoder, const std::vector<std::complex<double>> &values, double scale) {
-            std::cout << "[DEBUG] encode_new (complex) called with values.size() = " << values.size() << std::endl;
+        // Safely add numpy array support
+        .def("encode_new_numpy", [](const CKKSEncoder &encoder, py::array_t<double, py::array::c_style> values, double scale) {
+            auto buf = values.request();
+            if (buf.ndim != 1) {
+                throw std::runtime_error("Number of dimensions must be 1");
+            }
+            
+            const double* ptr = static_cast<const double*>(buf.ptr);
+            std::vector<double> vec(ptr, ptr + buf.shape[0]);
+            
+            std::cout << "[DEBUG] encode_new_numpy called with values.size() = " << vec.size() << std::endl;
             Plaintext plain;
-            encoder.encode(values, scale, plain);
+            encoder.encode(vec, scale, plain);
             return plain;
-        }, py::arg("values"), py::arg("scale"),
-        "Encodes a vector of complex<double> into a Plaintext with the given scale.");
+        }, py::arg("values"), py::arg("scale"));
 }

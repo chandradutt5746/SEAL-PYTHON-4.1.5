@@ -52,7 +52,14 @@ void bind_evaluator(py::module &m) {
         .def("mod_switch_to_plain_inplace", [](Evaluator &e, Plaintext &a, parms_id_type parms_id) { e.mod_switch_to_inplace(a, parms_id); })
 
         // Rescale (CKKS)
-        .def("rescale_to_next", [](Evaluator &e, Ciphertext &a) { e.rescale_to_next_inplace(a); })
+        .def("rescale_to_next", [](Evaluator &e, const Ciphertext &a, Ciphertext &destination) { 
+            e.rescale_to_next(a, destination); 
+        }, py::arg("encrypted"), py::arg("destination"),
+        "Rescales a ciphertext to the next level in the modulus switching chain.\n"
+        "Args:\n"
+        "    encrypted: The ciphertext to rescale\n"
+        "    destination: The destination ciphertext\n"
+        "Note: This reduces the scale by a factor of the last prime in the modulus chain.")
         .def("rescale_to", [](Evaluator &e, Ciphertext &a, parms_id_type parms_id) { e.rescale_to_inplace(a, parms_id); })
 
         // Rotation and Galois
