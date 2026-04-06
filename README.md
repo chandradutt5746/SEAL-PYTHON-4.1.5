@@ -1,11 +1,16 @@
-# SEAL-PYTHON-4.1.2
+# SEAL-Python 4.1.5
 
 **Author:** Chandradutt Patel
 **LinkedIn:** https://www.linkedin.com/in/cnpatel5746/
 
-A Python binding for [Microsoft SEAL](https://github.com/microsoft/SEAL), enabling easy-to-use homomorphic encryption in Python. This project allows you to perform encrypted computation on real numbers using the CKKS scheme, with support for serialization, bootstrapping, and more.
+[![PyPI version](https://badge.fury.io/py/seal-python.svg)](https://badge.fury.io/py/seal-python)
+[![Python Versions](https://img.shields.io/pypi/pyversions/seal-python.svg)](https://pypi.org/project/seal-python/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+A powerful Python binding for [Microsoft SEAL](https://github.com/microsoft/SEAL), enabling easy-to-use homomorphic encryption in Python. This project allows you to perform encrypted computation on real numbers and integers using CKKS, BFV, and BGV schemes, with advanced features including high-level wrapper APIs, NumPy integration, and comprehensive testing infrastructure.
 
 **Developed and maintained by Chandradutt Patel**
+
 ---
 
 ## Table of Contents
@@ -30,14 +35,35 @@ A Python binding for [Microsoft SEAL](https://github.com/microsoft/SEAL), enabli
 
 ## Features
 
-- Python bindings for Microsoft SEAL 4.1.2
-- CKKS, BFV, and BGV schemes for encrypted computation
-- **High-performance NumPy integration** for efficient data transfer and manipulation
+### Core Functionality
+- Python bindings for Microsoft SEAL 4.1.2+
+- **CKKS** scheme for encrypted floating-point computation
+- **BFV** and **BGV** schemes for encrypted integer computation
+- Full homomorphic operations: addition, multiplication, negation, square, rotation, and more
 - Serialization and deserialization of ciphertexts and keys
-- Batch operations for efficient processing of multiple ciphertexts
-- Zero-copy memory views for advanced performance
-- Example scripts for batching and NumPy integration
-- Beginner-friendly code and debug output for learning.
+- Security levels: TC128, TC192, TC256
+
+### Advanced Features (New in 4.1.5!)
+- **High-level Python wrapper API** with `CKKSHelper` and `BFVHelper` classes for easier usage
+- **Simplified parameter setup** with `create_ckks_params()` and `create_bfv_params()`
+- **Utility functions** for serialization, key management, and more
+- **Context managers** with `SEALContext` for automatic resource cleanup
+- **Batch processing** with `BatchProcessor` for efficient multi-value operations
+- **Performance monitoring** with `PerformanceMonitor` for optimization
+- **Key management** with `KeyManager` for save/load operations
+- **Computation patterns**: polynomial evaluation, matrix operations, dot product
+- **High-performance NumPy integration** for efficient data transfer and manipulation
+- **Zero-copy memory views** for advanced performance
+- **Batch operations** for efficient processing of multiple ciphertexts
+- **Pytest-based testing infrastructure** for reliability
+- **CI/CD pipeline** with GitHub Actions for automated testing and deployment
+
+### Developer-Friendly
+- PyPI package for easy installation via pip
+- Comprehensive documentation and examples
+- Type hints and docstrings for better IDE support
+- Beginner-friendly example scripts with detailed comments
+- Contributing guide for community collaboration
 
 ---
 
@@ -84,69 +110,127 @@ A Python binding for [Microsoft SEAL](https://github.com/microsoft/SEAL), enabli
 
 ## Installation
 
-### From GitHub
+### From PyPI (Recommended)
 
-Clone the repository:
+The easiest way to install SEAL-Python is via pip:
 
 ```sh
-git clone https://github.com/yourusername/SEAL-PYTHON-4.1.2.git
-cd SEAL-PYTHON-4.1.2
+pip install seal-python
 ```
-## Getting Microsoft SEAL Do not SKIP THIS STEP
+
+**Note:** Pre-built wheels may not be available for all platforms yet. If pip installation fails, use the "From Source" method below.
+
+### From Source
+
+For the latest development version or if pre-built wheels are not available:
+
+#### 1. Clone the repository
+
+```sh
+git clone https://github.com/chandradutt5746/SEAL-PYTHON-4.1.5.git
+cd SEAL-PYTHON-4.1.5
+```
+
+#### 2. Get Microsoft SEAL (Do not skip this step!)
 
 This binding requires the official [Microsoft SEAL](https://github.com/microsoft/SEAL) library.
 
-**Before building, clone SEAL into the `third_party/` directory:**
+**Clone SEAL into the `third_party/` directory:**
 
 ```sh
 git clone https://github.com/microsoft/SEAL.git third_party/SEAL
 ```
 
-### Build Instructions
-
-1. **Create a Python virtual environment (recommended):**
+#### 3. Create a Python virtual environment (recommended)
 
 ```sh
-    python3 -m venv .venv
-    source .venv/bin/activate
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-2. **Install Python dependencies:**
+#### 4. Install Python dependencies
 
 ```sh
-    pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
-3. **Build the C++ extension and SEAL library:**
+#### 5. Build the C++ extension and SEAL library
 
 ```sh
-    ./build.sh
+./build.sh
 ```
 
-    This will compile Microsoft SEAL and the Python bindings. The resulting `seal.so` will be placed in the `python/` directory.
+This will compile Microsoft SEAL and the Python bindings. The resulting `seal.so` will be placed in the `python/` and `seal/` directories.
 
-    **If you do not have `build.sh`, you can build manually:**
+**Manual build** (if `build.sh` doesn't work):
 
-    ```sh
-    mkdir -p build
-    cd build
-    cmake ..
-    make -j$(nproc)
-    cd ..
-    ```
-
-4. **(Optional) Install as a Python package:**
-    
-    ### If you want to use SEAL Library globally in your system run this command to install SEAL Globally.
-    
 ```sh
-            pip install .
+mkdir -p build
+cd build
+cmake ..
+make -j$(nproc)
+cd ..
 ```
 
-    This will install the package globally or in your virtual environment.
+#### 6. Install as a Python package (optional)
+
+If you want to use SEAL globally in your system:
+
+```sh
+pip install .
+```
+
+Or install in development/editable mode:
+
+```sh
+pip install -e .
+```
 ---
 
 ## Quick Start
+
+### Using the High-Level API (Easiest)
+
+The new high-level API makes homomorphic encryption much easier to use:
+
+```python
+import seal
+
+# CKKS Example (for floating-point numbers)
+helper = seal.CKKSHelper(poly_modulus_degree=8192)
+
+# Encrypt values
+encrypted_x = helper.encrypt(3.14)
+encrypted_y = helper.encrypt(2.0)
+
+# Perform homomorphic operations
+encrypted_sum = helper.add(encrypted_x, encrypted_y)
+encrypted_product = helper.multiply(encrypted_x, encrypted_y)
+
+# Decrypt results
+sum_result = helper.decrypt(encrypted_sum)       # ≈ 5.14
+product_result = helper.decrypt(encrypted_product)  # ≈ 6.28
+
+print(f"Sum: {sum_result}, Product: {product_result}")
+```
+
+```python
+# BFV Example (for integers)
+helper = seal.BFVHelper(poly_modulus_degree=4096)
+
+# Encrypt integer vectors
+encrypted_x = helper.encrypt([1, 2, 3, 4, 5])
+encrypted_y = helper.encrypt([5, 4, 3, 2, 1])
+
+# Homomorphic addition
+encrypted_sum = helper.add(encrypted_x, encrypted_y)
+
+# Decrypt
+result = helper.decrypt(encrypted_sum)
+print(f"Result: {result[:5]}")  # [6, 6, 6, 6, 6]
+```
+
+### Using the Low-Level API
 
 After building, you can run the example scripts:
 ### In this 'python' folder you will find seal.so file after building the Python Binding.
