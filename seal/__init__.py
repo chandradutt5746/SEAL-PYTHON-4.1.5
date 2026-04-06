@@ -21,9 +21,10 @@ try:
     from .seal import *
     SEAL_LOADED = True
 except ImportError as e:
-    import warnings
-    warnings.warn(f"Failed to import SEAL extension: {e}. Please build the extension first.")
     SEAL_LOADED = False
+    raise ImportError(
+        f"Failed to import SEAL extension: {e}. Please build the extension first."
+    ) from e
 
 # Import high-level utilities
 from .utils import (
@@ -42,9 +43,12 @@ __all__ = [
     'create_bfv_params',
     'serialize_to_bytes',
     'deserialize_from_bytes',
+    'show_security_warning',
     '__version__',
 ]
 
-if SEAL_LOADED:
+
+def show_security_warning():
+    """Display the package security warning on demand."""
     print(f"SEAL-Python {__version__} loaded successfully")
     print(SECURITY_WARNING)

@@ -6,7 +6,7 @@ import pytest
 # These tests will be skipped if seal.so is not built
 try:
     import seal
-    SEAL_AVAILABLE = True
+    SEAL_AVAILABLE = hasattr(seal, 'SEAL_LOADED') and seal.SEAL_LOADED and hasattr(seal, 'EncryptionParameters')
 except ImportError:
     SEAL_AVAILABLE = False
 

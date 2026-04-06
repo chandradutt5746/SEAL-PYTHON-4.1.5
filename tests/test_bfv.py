@@ -5,7 +5,7 @@ import pytest
 
 try:
     import seal
-    SEAL_AVAILABLE = True
+    SEAL_AVAILABLE = hasattr(seal, 'SEAL_LOADED') and seal.SEAL_LOADED and hasattr(seal, 'EncryptionParameters')
 except ImportError:
     SEAL_AVAILABLE = False
 

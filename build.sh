@@ -29,7 +29,7 @@ cmake --build . -- -j$(nproc)
 cp python/seal.so ../python/
 mkdir -p ../seal
 cp python/seal.so ../seal/
-cp ../python/__init__.py ../seal/
+# Note: Do NOT copy __init__.py - seal/__init__.py is now the source of truth
 
-echo "Build successful! Module saved to python/"
+echo "Build successful! Module saved to python/ and seal/"
 echo "Test with: cd python && python -c 'import seal'"

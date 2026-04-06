@@ -8,14 +8,38 @@ from typing import List, Optional, Union, Tuple
 import numpy as np
 
 
+def _has_required_seal_api(module) -> bool:
+    """Check if module has required SEAL API attributes."""
+    return all(
+        hasattr(module, attr)
+        for attr in (
+            "EncryptionParameters",
+            "scheme_type",
+            "CoeffModulus",
+            "PlainModulus",
+            "SEALContext",
+            "KeyGenerator",
+            "Encryptor",
+            "Decryptor",
+            "Evaluator",
+        )
+    )
+
+
 try:
-    from . import seal
+    from . import seal as seal_module
+    if not _has_required_seal_api(seal_module):
+        raise AttributeError("SEAL extension module is missing required attributes")
+    seal = seal_module
     SEAL_AVAILABLE = True
 except (ImportError, AttributeError):
     try:
-        import seal
+        import importlib
+        seal = importlib.import_module("seal.seal")
+        if not _has_required_seal_api(seal):
+            raise AttributeError("SEAL extension module is missing required attributes")
         SEAL_AVAILABLE = True
-    except ImportError:
+    except (ImportError, AttributeError, ModuleNotFoundError):
         SEAL_AVAILABLE = False
 
 
@@ -186,6 +210,9 @@ class CKKSHelper:
         self.decryptor = seal.Decryptor(self.context, self.secret_key)
         self.evaluator = seal.Evaluator(self.context)
 
+        # Track scalar vs vector for proper decryption
+        self._ciphertext_metadata = {}
+
     def encrypt(self, value: Union[float, List[float], np.ndarray]) -> 'seal.Ciphertext':
         """
         Encrypt a value or array of values.
@@ -197,8 +224,9 @@ class CKKSHelper:
             Encrypted ciphertext
         """
         plain = seal.Plaintext()
+        is_scalar = isinstance(value, (int, float))
 
-        if isinstance(value, (int, float)):
+        if is_scalar:
             self.encoder.encode(float(value), self.scale, plain)
         elif isinstance(value, (list, np.ndarray)):
             if isinstance(value, np.ndarray):
@@ -207,7 +235,10 @@ class CKKSHelper:
         else:
             raise TypeError(f"Cannot encrypt type {type(value)}")
 
-        return self.encryptor.encrypt(plain)
+        ciphertext = self.encryptor.encrypt(plain)
+        # Store metadata about whether this was a scalar
+        self._ciphertext_metadata[id(ciphertext)] = {'is_scalar': is_scalar}
+        return ciphertext
 
     def decrypt(self, encrypted: 'seal.Ciphertext') -> Union[float, List[float]]:
         """
@@ -217,16 +248,46 @@ class CKKSHelper:
             encrypted: Ciphertext to decrypt
 
         Returns:
-            Decrypted value(s)
+            Decrypted value(s) - returns float if encrypted as scalar, list otherwise
         """
         plain = seal.Plaintext()
         self.decryptor.decrypt(encrypted, plain)
         result = self.encoder.decode(plain)
 
-        # Return single value if it's a scalar
-        if len(result) == 1:
+        # Check if we have metadata about this ciphertext
+        metadata = self._ciphertext_metadata.get(id(encrypted), {})
+        if metadata.get('is_scalar', False):
             return result[0]
         return result
+
+    def decrypt_scalar(self, encrypted: 'seal.Ciphertext') -> float:
+        """
+        Decrypt a ciphertext and return only the first value as a scalar.
+
+        Args:
+            encrypted: Ciphertext to decrypt
+
+        Returns:
+            First decrypted value as a float
+        """
+        plain = seal.Plaintext()
+        self.decryptor.decrypt(encrypted, plain)
+        result = self.encoder.decode(plain)
+        return result[0]
+
+    def decrypt_vector(self, encrypted: 'seal.Ciphertext') -> List[float]:
+        """
+        Decrypt a ciphertext and return all values as a list.
+
+        Args:
+            encrypted: Ciphertext to decrypt
+
+        Returns:
+            All decrypted values as a list
+        """
+        plain = seal.Plaintext()
+        self.decryptor.decrypt(encrypted, plain)
+        return self.encoder.decode(plain)
 
     def add(self, encrypted1: 'seal.Ciphertext', encrypted2: 'seal.Ciphertext') -> 'seal.Ciphertext':
         """Add two encrypted values."""

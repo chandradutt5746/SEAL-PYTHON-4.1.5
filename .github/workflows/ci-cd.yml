@@ -58,7 +58,6 @@ jobs:
       run: |
         cd python
         python -m pytest ../tests/ -v --cov=seal --cov-report=xml --cov-report=term
-      continue-on-error: true
 
     - name: Upload coverage
       if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
@@ -87,18 +86,15 @@ jobs:
 
     - name: Check formatting with Black
       run: |
-        black --check seal/ tests/ || true
-      continue-on-error: true
+        black --check seal/ tests/
 
     - name: Check import sorting with isort
       run: |
-        isort --check-only seal/ tests/ || true
-      continue-on-error: true
+        isort --check-only seal/ tests/
 
     - name: Type check with mypy
       run: |
-        mypy seal/ || true
-      continue-on-error: true
+        mypy seal/
 
   build-wheels:
     name: Build wheels on ${{ matrix.os }}
