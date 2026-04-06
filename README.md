@@ -47,6 +47,11 @@ A powerful Python binding for [Microsoft SEAL](https://github.com/microsoft/SEAL
 - **High-level Python wrapper API** with `CKKSHelper` and `BFVHelper` classes for easier usage
 - **Simplified parameter setup** with `create_ckks_params()` and `create_bfv_params()`
 - **Utility functions** for serialization, key management, and more
+- **Context managers** with `SEALContext` for automatic resource cleanup
+- **Batch processing** with `BatchProcessor` for efficient multi-value operations
+- **Performance monitoring** with `PerformanceMonitor` for optimization
+- **Key management** with `KeyManager` for save/load operations
+- **Computation patterns**: polynomial evaluation, matrix operations, dot product
 - **High-performance NumPy integration** for efficient data transfer and manipulation
 - **Zero-copy memory views** for advanced performance
 - **Batch operations** for efficient processing of multiple ciphertexts

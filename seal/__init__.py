@@ -36,6 +36,23 @@ from .utils import (
     deserialize_from_bytes,
 )
 
+# Import advanced features
+try:
+    from .advanced import (
+        SEALContextManager,
+        SEALContext,  # Alias for SEALContextManager
+        BatchProcessor,
+        PerformanceMonitor,
+        KeyManager,
+        polynomial_evaluation,
+        matrix_vector_multiply,
+        dot_product,
+        measure_performance,
+    )
+    _ADVANCED_AVAILABLE = True
+except ImportError:
+    _ADVANCED_AVAILABLE = False
+
 __all__ = [
     'CKKSHelper',
     'BFVHelper',
@@ -46,6 +63,20 @@ __all__ = [
     'show_security_warning',
     '__version__',
 ]
+
+# Add advanced features to exports if available
+if _ADVANCED_AVAILABLE:
+    __all__.extend([
+        'SEALContext',
+        'SEALContextManager',
+        'BatchProcessor',
+        'PerformanceMonitor',
+        'KeyManager',
+        'polynomial_evaluation',
+        'matrix_vector_multiply',
+        'dot_product',
+        'measure_performance',
+    ])
 
 
 def show_security_warning():
