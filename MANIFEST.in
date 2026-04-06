@@ -1,0 +1,39 @@
+# Include documentation and license files
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTING.md
+include requirements.txt
+include pyproject.toml
+include setup.py
+
+# Include build scripts
+include build.sh
+include clean.sh
+include CMakeLists.txt
+
+# Include C++ source code for building
+recursive-include src *.cpp *.h
+recursive-include docs *.md *.rst
+
+# Include Python package files
+recursive-include seal *.py *.pyi
+recursive-include python *.py
+
+# Exclude compiled files and build artifacts
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyd
+global-exclude __pycache__
+global-exclude *.so
+global-exclude .DS_Store
+global-exclude *.egg-info
+
+# Exclude development and build directories
+prune .git
+prune .venv
+prune build
+prune dist
+prune third_party/SEAL
+prune .vscode
+prune .idea
